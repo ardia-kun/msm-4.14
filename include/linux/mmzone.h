@@ -318,7 +318,6 @@ enum {
 	LRU_GEN_NONLEAF_YOUNG,
 	NR_LRU_GEN_CAPS
 };
-
 #define MIN_LRU_BATCH		BITS_PER_LONG
 #define MAX_LRU_BATCH		(MIN_LRU_BATCH * 128)
 
@@ -414,7 +413,6 @@ struct lru_gen_mm_walk {
 	bool can_swap;
 	bool full_scan;
 };
-
 void lru_gen_init_lruvec(struct lruvec *lruvec);
 void *lru_gen_eviction(struct page *page);
 void lru_gen_refault(struct page *page, void *shadow);

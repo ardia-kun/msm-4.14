@@ -476,6 +476,7 @@ assign_new_owner:
 	}
 	mm->owner = c;
 	lru_gen_migrate_mm(mm);
+	task_unlock(c);
 	put_task_struct(c);
 }
 #endif /* CONFIG_MEMCG */

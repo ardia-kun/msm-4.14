@@ -757,18 +757,8 @@ KBUILD_AFLAGS	+= -Os
 KBUILD_LDFLAGS	+= -Os
 else
 ifeq ($(cc-name),clang)
-KBUILD_CFLAGS	+= -O3
-KBUILD_CFLAGS	+= -ffp-contract=fast
-KBUILD_CFLAGS	+= -mllvm -hot-cold-split=true
-else
-KBUILD_CFLAGS	+= -O2
-KBUILD_AFLAGS	+= -O2
-KBUILD_LDFLAGS	+= -O2
-ifdef CONFIG_INLINE_OPTIMIZATION
-KBUILD_CFLAGS	+= -mllvm -inline-threshold=2500
-KBUILD_CFLAGS	+= -mllvm -inlinehint-threshold=2000
-KBUILD_CFLAGS	+= -mllvm -unroll-threshold=1200
-endif
+KBUILD_CFLAGS += -mcpu=cortex-a76+crc+crypto -mtune=cortex-a76 -march=armv8.2-a+crc+crypto+lse+rdm+rcpc+dotprod -O3 -funroll-loops
+KBUILD_AFLAGS += -mcpu=cortex-a76+crc+crypto -mtune=cortex-a76 -march=armv8.2-a+crc+crypto+lse+rdm+rcpc+dotprod -O3 -funroll-loops
 endif
 endif
 

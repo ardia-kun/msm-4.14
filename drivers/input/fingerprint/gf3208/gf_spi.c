@@ -274,89 +274,20 @@ static int gfspi_ioctl_clk_uninit(struct gf_dev *data)
 }
 #endif
 
-static void nav_event_input(struct gf_dev *gf_dev, gf_nav_event_t nav_event)
-{
-	uint32_t nav_input = 0;
-
-	switch (nav_event) {
-	case GF_NAV_FINGER_DOWN:
-		pr_debug("%s nav finger down\n", __func__);
-		break;
-
-	case GF_NAV_FINGER_UP:
-		pr_debug("%s nav finger up\n", __func__);
-		break;
-
-	case GF_NAV_DOWN:
-		nav_input = GF_NAV_INPUT_DOWN;
-		pr_debug("%s nav down\n", __func__);
-		break;
-
-	case GF_NAV_UP:
-		nav_input = GF_NAV_INPUT_UP;
-		pr_debug("%s nav up\n", __func__);
-		break;
-
-	case GF_NAV_LEFT:
-		nav_input = GF_NAV_INPUT_LEFT;
-		pr_debug("%s nav left\n", __func__);
-		break;
-
-	case GF_NAV_RIGHT:
-		nav_input = GF_NAV_INPUT_RIGHT;
-		pr_debug("%s nav right\n", __func__);
-		break;
-
-	case GF_NAV_CLICK:
-		nav_input = GF_NAV_INPUT_CLICK;
-		pr_debug("%s nav click\n", __func__);
-		break;
-
-	case GF_NAV_HEAVY:
-		nav_input = GF_NAV_INPUT_HEAVY;
-		pr_debug("%s nav heavy\n", __func__);
-		break;
-
-	case GF_NAV_LONG_PRESS:
-		nav_input = GF_NAV_INPUT_LONG_PRESS;
-		pr_debug("%s nav long press\n", __func__);
-		break;
-
-	case GF_NAV_DOUBLE_CLICK:
-		nav_input = GF_NAV_INPUT_DOUBLE_CLICK;
-		pr_debug("%s nav double click\n", __func__);
-		break;
-
-	default:
-		pr_debug("%s unknown nav event: %d\n", __func__, nav_event);
-		break;
-	}
-
-	if ((nav_event != GF_NAV_FINGER_DOWN) &&
-			(nav_event != GF_NAV_FINGER_UP)) {
-		input_report_key(gf_dev->input, nav_input, 1);
-		input_sync(gf_dev->input);
-		input_report_key(gf_dev->input, nav_input, 0);
-		input_sync(gf_dev->input);
-	}
-}
-
-static irqreturn_t gf_irq(int irq, void *handle)
-{
-#if defined(GF_NETLINK_ENABLE)
-	char msg[2] =  { 0x0 };
-	//wake_lock_timeout(&fp_wakelock, msecs_to_jiffies(WAKELOCK_HOLD_TIME));
-	__pm_wakeup_event(&fp_ws, WAKELOCK_HOLD_TIME);//for kernel 4.9
-	msg[0] = GF_NET_EVENT_IRQ;
-	sendnlmsg(msg);
-#elif defined(GF_FASYNC)
-	struct gf_dev *gf_dev = &gf;
-
-	if (gf_dev->async)
-		kill_fasync(&gf_dev->async, SIGIO, POLL_IN);
-#endif
-
-	return IRQ_HANDLED;
+static inline void gf_setup(struct gf_dev *gf_dev) {
+	gf_dev->rst_gpio = of_get_named_gpio(gf_dev->spi->dev.of_node,
+		"fp-gpio-reset", 0);
+	gpio_request(gf_dev->rst_gpio, "goodix_reset");
+	gpio_direction_output(gf_dev->rst_gpio, 1);
+	gf_dev->irq_gpio = of_get_named_gpio(gf_dev->spi->dev.of_node,
+		"fp-gpio-irq", 0);
+	gpio_request(gf_dev->irq_gpio, "goodix_irq");
+	gpio_direction_input(gf_dev->irq_gpio);
+	gf_dev->irq = gpio_to_irq(gf_dev->irq_gpio);
+	if (request_threaded_irq(gf_dev->irq, NULL, gf_irq,
+			IRQF_TRIGGER_RISING | IRQF_ONESHOT, "gf", gf_dev))
+		irq_switch(gf_dev, 1);
+	return;
 }
 
 static int irq_setup(struct gf_dev *gf_dev)

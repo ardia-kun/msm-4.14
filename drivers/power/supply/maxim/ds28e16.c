@@ -1737,9 +1737,12 @@ static void authentic_work(struct work_struct *work)
 	int rc;
 	union power_supply_propval pval = {0,};
 
-	struct ds28e16_data *ds28e16_data = container_of(work,
-				struct ds28e16_data,
-				authentic_work.work);
+	struct ds28e16_data *ds28e16_data =
+		container_of(work, struct ds28e16_data, authentic_work.work);
+		if (!ds28e16_data || !ds28e16_data->verify_psy) {
+			ds_log("battery verify_psy is null, aborting authentic work\n");
+			return;
+		}
 
 	rc = power_supply_get_property(ds28e16_data->verify_psy,
 					POWER_SUPPLY_PROP_AUTHEN_RESULT, &pval);

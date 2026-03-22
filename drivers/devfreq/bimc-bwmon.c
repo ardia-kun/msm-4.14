@@ -33,6 +33,8 @@
 #include <linux/msm-bus-board.h>
 #include "governor_bw_hwmon.h"
 
+extern unsigned int tea_ram_xmp_active;
+
 #define GLB_INT_STATUS(m)	((m)->global_base + 0x100)
 #define GLB_INT_CLR(m)		((m)->global_base + 0x108)
 #define	GLB_INT_EN(m)		((m)->global_base + 0x10C)
@@ -481,8 +483,8 @@ void set_zone_thres(struct bwmon *m, unsigned int sample_ms,
 	lo = 0;
 
 	if (unlikely((hi > m->thres_lim) || (med > hi) || (lo > med))) {
-		pr_warn_ratelimited("Zone thres larger than hw limit: hi:%u med:%u lo:%u\n",
-				hi, med, lo);
+	/*	pr_warn("Zone thres larger than hw limit: hi:%u med:%u lo:%u\n",
+				hi, med, lo); */
 		hi = min(hi, m->thres_lim);
 		med = min(med, hi - 1);
 		lo = min(lo, med-1);
@@ -636,6 +638,10 @@ unsigned long mon_get_count(struct bwmon *m, enum mon_reg_type type)
 	case MON3:
 		count = mon_get_zone_stats(m, type);
 		break;
+	}
+
+	if (tea_ram_xmp_active == 1) {
+		return 0xFFFFFFFF; 
 	}
 
 	return count;

@@ -29,6 +29,9 @@
 #include "kgsl_trace.h"
 #include "kgsl_gmu_core.h"
 
+unsigned int tea_ram_xmp_active = 0;
+EXPORT_SYMBOL(tea_ram_xmp_active);
+
 #define KGSL_PWRFLAGS_POWER_ON 0
 #define KGSL_PWRFLAGS_CLK_ON   1
 #define KGSL_PWRFLAGS_AXI_ON   2
@@ -409,6 +412,8 @@ unsigned int kgsl_pwrctrl_adjust_pwrlevel(struct kgsl_device *device,
 void kgsl_pwrctrl_pwrlevel_change(struct kgsl_device *device,
 				unsigned int new_level)
 {
+	static int tea_heavy_load_counter = 0;
+	static int tea_idle_counter = 0;
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 	struct kgsl_pwrlevel *pwrlevel;
 	unsigned int old_level = pwr->active_pwrlevel;
@@ -420,6 +425,31 @@ void kgsl_pwrctrl_pwrlevel_change(struct kgsl_device *device,
 	 * thermal limit, kick off the cycling.
 	 */
 	kgsl_pwrctrl_set_thermal_cycle(device, new_level);
+
+	if (new_level <= 3) {
+		tea_idle_counter = 0;
+        tea_heavy_load_counter++;
+		
+		if (tea_heavy_load_counter >= 5) { 
+			tea_ram_xmp_active = 1;
+			
+			if (tea_heavy_load_counter > 100) {
+                tea_heavy_load_counter = 5;
+            }
+        }
+    } 
+    else { 
+        tea_heavy_load_counter = 0;
+        tea_idle_counter++;
+		
+		if (tea_idle_counter >= 15) {
+			tea_ram_xmp_active = 0;
+			
+			if (tea_idle_counter > 100) {
+                tea_idle_counter = 15;
+            }
+        }
+    }
 
 	if (new_level == old_level &&
 		!test_bit(GMU_DCVS_REPLAY, &device->gmu_core.flags))

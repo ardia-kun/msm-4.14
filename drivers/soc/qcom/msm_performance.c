@@ -49,8 +49,8 @@ struct events {
 static struct events events_group;
 static struct task_struct *events_notify_thread;
 
-static unsigned int aggr_big_nr;
-static unsigned int aggr_top_load;
+//static unsigned int aggr_big_nr;
+//static unsigned int aggr_top_load;
 
 /*******************************sysfs start************************************/
 static int set_cpu_min_freq(const char *buf, const struct kernel_param *kp)
@@ -152,6 +152,7 @@ static const struct kernel_param_ops param_ops_cpu_max_freq = {
 };
 module_param_cb(cpu_max_freq, &param_ops_cpu_max_freq, NULL, 0644);
 
+#if 0
 static struct kobject *events_kobj;
 
 static ssize_t show_cpu_hotplug(struct kobject *kobj,
@@ -200,6 +201,7 @@ static struct attribute_group notify_attr_group = {
 	.attrs = notify_attrs,
 };
 static struct kobject *notify_kobj;
+#endif
 
 /*******************************sysfs ends************************************/
 
@@ -245,6 +247,7 @@ static int hotplug_notify(unsigned int cpu)
 	return 0;
 }
 
+#if 0
 static int events_notify_userspace(void *data)
 {
 	unsigned long flags;
@@ -398,6 +401,7 @@ static const struct kernel_param_ops param_ops_cc_register = {
 };
 module_param_cb(core_ctl_register, &param_ops_cc_register,
 		&core_ctl_register, 0644);
+#endif
 
 static int __init msm_performance_init(void)
 {
@@ -414,8 +418,8 @@ static int __init msm_performance_init(void)
 		hotplug_notify,
 		NULL);
 
-	init_events_group();
-	init_notify_group();
+	//init_events_group();
+	//init_notify_group();
 
 	return 0;
 }

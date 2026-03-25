@@ -46,7 +46,7 @@ jobs:
         run: |
           BUILD_DATE="$(date '+%H:%M %d/%m/%Y')"
           HEAD="$(git rev-parse HEAD)"
-          HEAD_COMMIT="https://github.com/rd-stuffs/msm-4.14/commit/$HEAD"
+          HEAD_COMMIT="https://github.com/ardia-kun/msm-4.14/commit/$HEAD"
           echo -e "${BUILD_DATE}\n\n${HEAD_COMMIT}" > caption.txt
 
       - name: Upload standard build to Telegram

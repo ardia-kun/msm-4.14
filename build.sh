@@ -4,7 +4,7 @@
 # Copyright (C) 2020-2021 Adithya R.
 
 SECONDS=0
-ZIPNAME="FSociety-surya-$(date '+%Y%m%d-%H%M').zip"
+ZIPNAME="Deepcool-surya-$(date '+%Y%m%d-%H%M').zip"
 LLVM_REV="22"
 TC_DIR="$(pwd)/tc/clang-$LLVM_REV"
 AK3_DIR="$(pwd)/android/AnyKernel3"
@@ -27,7 +27,7 @@ fi
 
 if ! [ -d "$AK3_DIR" ]; then
 	echo "AnyKernel3 not found! Cloning to $AK3_DIR..."
-	if ! git clone --depth=1 -b FSociety https://github.com/rd-stuffs/AnyKernel3.git "$AK3_DIR"; then
+	if ! git clone --depth=1 -b master https://github.com/ardia-kun/AnyKernel3.git "$AK3_DIR"; then
 		echo "Cloning failed! Aborting..."
 		exit 1
 	fi
@@ -41,7 +41,7 @@ if [[ $1 = "-rf" || $1 = "--regen-full" ]]; then
 fi
 
 CLEAN=false
-KSU=false
+KSU=true
 
 for arg in "$@"; do
 	case $arg in
@@ -67,7 +67,7 @@ make $DEFCONFIG
 
 if [[ "$KSU" = true ]]; then
 	echo -e "\nBuilding with KernelSU support...\n"
-	ZIPNAME="${ZIPNAME/FSociety-surya/FSociety-KSU}"
+	ZIPNAME="${ZIPNAME/Deepcool-surya/Deepcool-KSU}"
 	scripts/config --file out/.config -e KSU -e KSU_MANUAL_HOOK
 	make olddefconfig
 fi
@@ -82,7 +82,7 @@ if [ -f "$kernel" ] && [ -f "$dtbo" ]; then
 	cp -r $AK3_DIR AnyKernel3
 	cp $kernel $dtbo AnyKernel3
 	cd AnyKernel3
-	git checkout FSociety &> /dev/null
+	git checkout master &> /dev/null
 	zip -r9 "../$ZIPNAME" * -x .git modules\* patch\* ramdisk\* README.md *placeholder
 	cd ..
 	rm -rf AnyKernel3

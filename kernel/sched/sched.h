@@ -506,6 +506,13 @@ struct cfs_rq {
 	struct load_weight load;
 	unsigned int nr_running, h_nr_running, idle_h_nr_running;
 
+	/* EEVDF: Deadline and lag tracking */
+	u64 avg_vruntime;
+	s64 avg_lag;
+	u64 zero_vruntime;
+	u64 slice;
+	u32 entity_count;
+
 	u64 exec_clock;
 	u64 min_vruntime;
 #ifndef CONFIG_64BIT

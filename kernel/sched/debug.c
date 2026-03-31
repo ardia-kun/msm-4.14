@@ -527,6 +527,18 @@ void print_cfs_rq(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq)
 			cfs_rq->throttle_count);
 #endif
 
+	/* EEVDF debugging */
+	if (sysctl_sched_use_eevdf) {
+		SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "avg_vruntime",
+				SPLIT_NS(cfs_rq->avg_vruntime));
+		SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "avg_lag",
+				SPLIT_NS(cfs_rq->avg_lag));
+		SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "slice",
+				SPLIT_NS(cfs_rq->slice));
+		SEQ_printf(m, "  .%-30s: %d\n", "entity_count",
+				cfs_rq->entity_count);
+	}
+
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	print_cfs_group_stats(m, cpu, cfs_rq->tg);
 #endif
@@ -717,6 +729,7 @@ static void sched_debug_header(struct seq_file *m)
 	PN(sysctl_sched_latency);
 	PN(sysctl_sched_min_granularity);
 	PN(sysctl_sched_wakeup_granularity);
+	P(sysctl_sched_use_eevdf);
 	P(sysctl_sched_child_runs_first);
 #ifdef CONFIG_SCHED_WALT
 	P(sched_init_task_load_windows);

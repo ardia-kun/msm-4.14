@@ -504,6 +504,13 @@ struct sched_entity {
 	u64				vruntime;
 	u64				prev_sum_exec_runtime;
 
+	/* EEVDF: Virtual deadline and slice tracking */
+	u64				deadline;
+	s64				slice;
+	s64				lag;
+	u64				slice_remaining;
+	int				custom_slice;
+
 	u64				nr_migrations;
 
 	struct sched_statistics		statistics;

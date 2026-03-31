@@ -154,6 +154,7 @@ unsigned int sysctl_sched_wakeup_granularity		= 100000UL;
 unsigned int normalized_sysctl_sched_wakeup_granularity	= 200000UL;
 
 unsigned int __read_mostly sysctl_sched_migration_cost	= 150000UL; /* EEVDF: Lower for faster migration */;
+unsigned int __read_mostly sysctl_sched_use_eevdf = 0; /* Enable EEVDF scheduler (default: disabled for compatibility) */
 DEFINE_PER_CPU_READ_MOSTLY(int, sched_load_boost);
 
 #ifdef CONFIG_SCHED_WALT
@@ -603,7 +604,15 @@ static inline u64 min_vruntime(u64 min_vruntime, u64 vruntime)
 static inline int entity_before(struct sched_entity *a,
 				struct sched_entity *b)
 {
-	return (s64)(a->vruntime - b->vruntime) < 0;
+	if (sysctl_sched_use_eevdf) {
+		/* EEVDF: Compare by deadline, then by vruntime as tiebreaker */
+		if (a->deadline != b->deadline)
+			return (s64)(a->deadline - b->deadline) < 0;
+		return (s64)(a->vruntime - b->vruntime) < 0;
+	} else {
+		/* CFS: Compare by vruntime */
+		return (s64)(a->vruntime - b->vruntime) < 0;
+	}
 }
 
 static void update_min_vruntime(struct cfs_rq *cfs_rq)
@@ -704,6 +713,62 @@ struct sched_entity *__pick_last_entity(struct cfs_rq *cfs_rq)
 		return NULL;
 
 	return rb_entry(last, struct sched_entity, run_node);
+}
+
+/*
+ * EEVDF: Check if entity is eligible to run (lag >= 0)
+ */
+static int entity_eligible(struct cfs_rq *cfs_rq, struct sched_entity *se)
+{
+	if (!sysctl_sched_use_eevdf)
+		return 1; /* Always eligible when EEVDF disabled */
+
+	s64 lag = se->lag;
+
+	return lag >= 0;
+}
+
+/*
+ * EEVDF: Calculate virtual deadline for an entity
+ */
+static void update_entity_deadline(struct cfs_rq *cfs_rq, struct sched_entity *se)
+{
+	if (!sysctl_sched_use_eevdf)
+		return;
+
+	if (entity_eligible(cfs_rq, se)) {
+		/* Eligible: deadline = vruntime + slice */
+		se->deadline = se->vruntime + se->slice;
+	} else {
+		/* Non-eligible: push deadline far into future */
+		se->deadline = se->vruntime + (se->slice * 10);
+	}
+}
+
+/*
+ * EEVDF: Update lag for fairness tracking
+ */
+static void update_entity_lag(struct cfs_rq *cfs_rq, struct sched_entity *se)
+{
+	if (!sysctl_sched_use_eevdf)
+		return;
+
+	se->lag = se->vruntime - cfs_rq->avg_vruntime;
+}
+
+/*
+ * EEVDF: Initialize entity for EEVDF scheduling
+ */
+static void init_entity_eevdf(struct cfs_rq *cfs_rq, struct sched_entity *se)
+{
+	if (!sysctl_sched_use_eevdf)
+		return;
+
+	se->slice = cfs_rq->slice;
+	se->deadline = se->vruntime + se->slice;
+	se->lag = 0;
+	se->slice_remaining = se->slice;
+	se->custom_slice = 0;
 }
 
 /**************************************************************
@@ -940,6 +1005,18 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	schedstat_add(cfs_rq->exec_clock, delta_exec);
 
 	curr->vruntime += calc_delta_fair(delta_exec, curr);
+
+	/* EEVDF: Update deadline and lag tracking */
+	if (sysctl_sched_use_eevdf) {
+		curr->slice_remaining -= delta_exec;
+		if (curr->slice_remaining <= 0) {
+			/* Slice exhausted, update deadline */
+			curr->slice_remaining = curr->slice;
+			curr->deadline = curr->vruntime + curr->slice;
+		}
+		update_entity_lag(cfs_rq, curr);
+	}
+
 	update_min_vruntime(cfs_rq);
 
 	if (entity_is_task(curr)) {
@@ -4093,6 +4170,20 @@ place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 {
 	u64 vruntime = cfs_rq->min_vruntime;
 
+	if (sysctl_sched_use_eevdf) {
+		/* EEVDF: Preserve lag on wakeup (deferred dequeue) */
+		if (initial) {
+			/* New task: place at min_vruntime */
+			se->vruntime = vruntime;
+			se->lag = 0;
+		} else {
+			/* Waking task: preserve existing lag */
+			/* vruntime stays as-is, lag calculation will handle fairness */
+		}
+		se->deadline = se->vruntime + se->slice;
+		return;
+	}
+
 	/*
 	 * The 'current' period is already promised to the current tasks,
 	 * however the extra weight of the new task will slow them down a
@@ -4229,6 +4320,11 @@ enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	update_load_avg(se, UPDATE_TG);
 	enqueue_entity_load_avg(cfs_rq, se);
 	update_cfs_shares(se);
+
+	/* EEVDF: Initialize entity for deadline scheduling */
+	if (sysctl_sched_use_eevdf && !se->custom_slice)
+		init_entity_eevdf(cfs_rq, se);
+
 	account_entity_enqueue(cfs_rq, se);
 
 	if (flags & ENQUEUE_WAKEUP)
@@ -4442,6 +4538,30 @@ pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 {
 	struct sched_entity *left = __pick_first_entity(cfs_rq);
 	struct sched_entity *se;
+
+	if (sysctl_sched_use_eevdf) {
+		/* EEVDF: Find the earliest eligible deadline */
+		struct rb_node *node = rb_first_cached(&cfs_rq->tasks_timeline);
+		struct sched_entity *best = NULL;
+
+		for (; node; node = rb_next(node)) {
+			struct sched_entity *se = rb_entry(node, struct sched_entity, run_node);
+
+			/* Update deadline and lag for this entity */
+			update_entity_lag(cfs_rq, se);
+			update_entity_deadline(cfs_rq, se);
+
+			/* Skip non-eligible entities */
+			if (!entity_eligible(cfs_rq, se))
+				continue;
+
+			/* First eligible entity or better deadline */
+			if (!best || entity_before(se, best))
+				best = se;
+		}
+
+		left = best;
+	}
 
 	/*
 	 * If curr is set we have to see if its left of the leftmost entity
@@ -12731,6 +12851,14 @@ void init_cfs_rq(struct cfs_rq *cfs_rq)
 #ifndef CONFIG_64BIT
 	cfs_rq->min_vruntime_copy = cfs_rq->min_vruntime;
 #endif
+
+	/* EEVDF: Initialize deadline and lag tracking */
+	cfs_rq->avg_vruntime = 0;
+	cfs_rq->avg_lag = 0;
+	cfs_rq->zero_vruntime = 0;
+	cfs_rq->slice = sysctl_sched_latency; /* Default slice */
+	cfs_rq->entity_count = 0;
+
 #ifdef CONFIG_SMP
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	cfs_rq->propagate_avg = 0;

@@ -68,7 +68,7 @@ make $DEFCONFIG
 if [[ "$KSU" = true ]]; then
 	echo -e "\nBuilding with KernelSU support...\n"
 	ZIPNAME="${ZIPNAME/Deepcool-surya/Deepcool-KSU}"
-	scripts/config --file out/.config -e KSU -e KSU_MANUAL_HOOK
+	scripts/config --file out/.config -e KSU 
 	make olddefconfig
 fi
 

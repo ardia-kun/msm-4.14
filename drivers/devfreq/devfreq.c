@@ -1087,14 +1087,8 @@ static ssize_t cur_freq_show(struct device *dev, struct device_attribute *attr,
 	struct devfreq *devfreq = to_devfreq(dev);
 
 	if (devfreq->profile->get_cur_freq &&
-		!devfreq->profile->get_cur_freq(devfreq->dev.parent, &freq)) {
-		if (freq >= 10000 && freq <= 99999) 
-			return sprintf(buf, "%lu\n", freq * 1000);
+		!devfreq->profile->get_cur_freq(devfreq->dev.parent, &freq))
 		return sprintf(buf, "%lu\n", freq);
-	}
-
-	if (devfreq->previous_freq >= 10000 && devfreq->previous_freq <= 99999)
-		return sprintf(buf, "%lu\n", devfreq->previous_freq * 1000);
 
 	return sprintf(buf, "%lu\n", devfreq->previous_freq);
 }
@@ -1103,9 +1097,7 @@ static DEVICE_ATTR_RO(cur_freq);
 static ssize_t target_freq_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	unsigned long val = to_devfreq(dev)->previous_freq;
-	if (val >= 10000 && val <= 99999) val *= 1000;
-	return sprintf(buf, "%lu\n", val);
+	return sprintf(buf, "%lu\n", to_devfreq(dev)->previous_freq);
 }
 static DEVICE_ATTR_RO(target_freq);
 
@@ -1205,10 +1197,7 @@ unlock:
 static ssize_t name##_show					\
 (struct device *dev, struct device_attribute *attr, char *buf)	\
 {								\
-	unsigned long val = to_devfreq(dev)->name;		\
-	if (val >= 10000 && val <= 99999)			\
-		val *= 1000;					\
-	return sprintf(buf, "%lu\n", val);			\
+	return sprintf(buf, "%lu\n", to_devfreq(dev)->name);	\
 }
 show_one(min_freq);
 show_one(max_freq);
@@ -1230,8 +1219,6 @@ static ssize_t available_frequencies_show(struct device *d,
 
 	use_opp = dev_pm_opp_get_opp_count(dev) > 0;
 	while (use_opp || (!use_opp && i < max_state)) {
-		unsigned long disp_freq;
-
 		if (use_opp) {
 			opp = dev_pm_opp_find_freq_ceil(dev, &freq);
 			if (IS_ERR(opp))
@@ -1241,12 +1228,8 @@ static ssize_t available_frequencies_show(struct device *d,
 			freq = df->profile->freq_table[i++];
 		}
 
-		disp_freq = freq;
-		if (disp_freq >= 10000 && disp_freq <= 99999) 
-			disp_freq *= 1000;
-
 		count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
-				   "%lu ", disp_freq);
+				   "%lu ", freq);
 		freq++;
 	}
 

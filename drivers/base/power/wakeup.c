@@ -639,14 +639,6 @@ static bool check_for_block(struct wakeup_source *ws)
 		if (wl_blocker_debug)
 			printk("Boeffla WL blocker: %s blocked\n", ws->name);
 
-		// if it is currently active, deactivate it immediately + log in debug mode
-		if (ws->active) {
-			wakeup_source_deactivate(ws);
-
-			if (wl_blocker_debug)
-				printk("Boeffla WL blocker: %s killed\n", ws->name);
-		}
-
 		// finally block it
 		return true;
 	}
@@ -936,12 +928,18 @@ void pm_get_active_wakeup_sources(char *pending_wakeup_source, size_t max)
 	srcuidx = srcu_read_lock(&wakeup_srcu);
 	list_for_each_entry_rcu(ws, &wakeup_sources, entry) {
 		if (ws->active && len < max) {
-			if (!active)
-				len += scnprintf(pending_wakeup_source, max,
-						"Pending Wakeup Sources: ");
-			len += scnprintf(pending_wakeup_source + len, max - len,
-				"%s ", ws->name);
-			active = true;
+#ifdef CONFIG_BOEFFLA_WL_BLOCKER
+			if (!check_for_block(ws)) {	// AP: check if wakelock is on wakelock blocker list
+#endif
+				if (!active)
+					len += scnprintf(pending_wakeup_source, max,
+							"Pending Wakeup Sources: ");
+				len += scnprintf(pending_wakeup_source + len, max - len,
+					"%s ", ws->name);
+				active = true;
+#ifdef CONFIG_BOEFFLA_WL_BLOCKER
+			}
+#endif
 		} else if (!active &&
 			   (!last_active_ws ||
 			    ktime_to_ns(ws->last_time) >

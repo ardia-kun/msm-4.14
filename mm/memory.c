@@ -4284,7 +4284,6 @@ bool can_reuse_spf_vma(struct vm_area_struct *vma, unsigned long address)
 	return ret;
 }
 #endif /* CONFIG_SPECULATIVE_PAGE_FAULT */
->>>>>>> c0565fbc18b1 (ANDROID: Make MGLRU aware of speculative faults)
 
 /*
  * By the time we get here, we already hold the mm semaphore

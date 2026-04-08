@@ -79,8 +79,89 @@ static DEFINE_MUTEX(device_list_lock);
 static struct wakeup_source fp_ws;//for kernel 4.9
 static struct gf_dev gf;
 
-extern int fpsensor;
+int fpsensor __weak = 2;
 static struct proc_dir_entry *proc_entry;
+
+static void gf_enable_irq(struct gf_dev *gf_dev);
+static void gf_disable_irq(struct gf_dev *gf_dev);
+
+#ifndef IRQF_PERF_AFFINE
+#define IRQF_PERF_AFFINE 0
+#endif
+
+static irqreturn_t gf_irq(int irq, void *handle)
+{
+	struct gf_dev *gf_dev = handle;
+	char netlink_msg[2] = { GF_NET_EVENT_IRQ + '0', '\0' };
+
+	(void)irq;
+
+	if (!gf_dev)
+		return IRQ_NONE;
+
+	__pm_wakeup_event(&fp_ws, WAKELOCK_HOLD_TIME);
+	sendnlmsg(netlink_msg);
+
+	return IRQ_HANDLED;
+}
+
+static void irq_switch(struct gf_dev *gf_dev, int on)
+{
+	if (!gf_dev)
+		return;
+
+	if (on)
+		gf_enable_irq(gf_dev);
+	else
+		gf_disable_irq(gf_dev);
+}
+
+#if defined(SUPPORT_NAV_EVENT)
+static void nav_event_input(struct gf_dev *gf_dev, gf_nav_event_t nav_event)
+{
+	unsigned int key = 0;
+
+	if (!gf_dev || !gf_dev->input)
+		return;
+
+	switch (nav_event) {
+	case GF_NAV_UP:
+		key = GF_NAV_INPUT_UP;
+		break;
+	case GF_NAV_DOWN:
+		key = GF_NAV_INPUT_DOWN;
+		break;
+	case GF_NAV_LEFT:
+		key = GF_NAV_INPUT_LEFT;
+		break;
+	case GF_NAV_RIGHT:
+		key = GF_NAV_INPUT_RIGHT;
+		break;
+	case GF_NAV_CLICK:
+		key = GF_NAV_INPUT_CLICK;
+		break;
+	case GF_NAV_DOUBLE_CLICK:
+		key = GF_NAV_INPUT_DOUBLE_CLICK;
+		break;
+	case GF_NAV_LONG_PRESS:
+		key = GF_NAV_INPUT_LONG_PRESS;
+		break;
+	case GF_NAV_HEAVY:
+		key = GF_NAV_INPUT_HEAVY;
+		break;
+	default:
+		break;
+	}
+
+	if (!key)
+		return;
+
+	input_report_key(gf_dev->input, key, 1);
+	input_sync(gf_dev->input);
+	input_report_key(gf_dev->input, key, 0);
+	input_sync(gf_dev->input);
+}
+#endif
 
 #if 0
 static struct gf_key_map maps[] = {
@@ -275,10 +356,10 @@ static int gfspi_ioctl_clk_uninit(struct gf_dev *data)
 #endif
 
 static inline void gf_setup(struct gf_dev *gf_dev) {
-	gf_dev->rst_gpio = of_get_named_gpio(gf_dev->spi->dev.of_node,
+	gf_dev->reset_gpio = of_get_named_gpio(gf_dev->spi->dev.of_node,
 		"fp-gpio-reset", 0);
-	gpio_request(gf_dev->rst_gpio, "goodix_reset");
-	gpio_direction_output(gf_dev->rst_gpio, 1);
+	gpio_request(gf_dev->reset_gpio, "goodix_reset");
+	gpio_direction_output(gf_dev->reset_gpio, 1);
 	gf_dev->irq_gpio = of_get_named_gpio(gf_dev->spi->dev.of_node,
 		"fp-gpio-irq", 0);
 	gpio_request(gf_dev->irq_gpio, "goodix_irq");

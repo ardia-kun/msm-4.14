@@ -39,6 +39,20 @@
 #define SZ_4G (((size_t) SZ_1G) * 4)
 #endif
 
+#ifndef atomic_long_try_cmpxchg
+static inline bool atomic_long_try_cmpxchg(atomic_long_t *v, long *old,
+					    long new)
+{
+	long prev = atomic_long_cmpxchg(v, *old, new);
+
+	if (prev == *old)
+		return true;
+
+	*old = prev;
+	return false;
+}
+#endif
+
 static DEFINE_IDR(zram_index_idr);
 /* idr index must be protected */
 static DEFINE_MUTEX(zram_index_mutex);

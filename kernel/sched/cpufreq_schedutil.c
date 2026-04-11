@@ -200,7 +200,7 @@ static void sugov_deferred_update(struct sugov_policy *sg_policy, u64 time,
  *
  * next_freq = C * curr_freq * util_raw / max
  *
- * Take C = 1.25 for the frequency tipping point at (util / max) = 0.8.
+ * Take C = 1.05 for the frequency tipping point, preferring lower frequencies.
  *
  * The lowest driver-supported frequency which is equal or greater than the raw
  * next_freq (as calculated above) is returned, subject to policy min/max and
@@ -217,12 +217,12 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 		freq = policy->cpuinfo.max_freq;
 	else
 		/*
-		 * Apply a 25% margin so that we select a higher frequency than
-		 * the current one before the CPU is fully busy:
+		 * Apply a 5% margin so that CPU preferentially stays at lower frequency.
+		 * This reduces aggressive frequency scaling while maintaining responsiveness:
 		 */
-		freq = policy->cur + (policy->cur >> 2);
+		freq = policy->cur + (policy->cur >> 4);
 
-	freq = (freq + (freq >> 2)) * util / max;
+	freq = (freq + (freq >> 4)) * util / max;
 
 	if (freq == sg_policy->cached_raw_freq && !sg_policy->need_freq_update)
 		return sg_policy->next_freq;

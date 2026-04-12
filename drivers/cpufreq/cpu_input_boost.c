@@ -64,12 +64,15 @@ static struct boost_drv boost_drv_g __read_mostly = {
 static unsigned int get_input_boost_freq(struct cpufreq_policy *policy)
 {
 	unsigned int freq;
+	unsigned int max_boost_freq = 576000; /* Limit boost to 576MHz for battery saving */
 
 	if (cpumask_test_cpu(policy->cpu, cpu_lp_mask))
 		freq = max(input_boost_freq_lp, min_freq_lp);
 	else
 		freq = max(input_boost_freq_hp, min_freq_hp);
 
+	/* Cap frequency at 576MHz for battery efficiency */
+	freq = min(freq, max_boost_freq);
 	return min(freq, policy->max);
 }
 

@@ -39,6 +39,7 @@
 #include "sched.h"
 #include "tune.h"
 #include "walt.h"
+#include <linux/prefer_silver.h>
 
 #ifdef CONFIG_SMP
 static inline bool task_fits_max(struct task_struct *p, int cpu);
@@ -8718,6 +8719,13 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 	/* find most energy-efficient CPU */
 	target_cpu = select_energy_cpu_idx(eenv) < 0 ? prev_cpu :
 					eenv->cpu[eenv->next_idx].cpu_id;
+
+	/* Check prefer_silver for energy-efficient task placement */
+	if (sysctl_prefer_silver && prefer_silver_check_task_util(p)) {
+		int best = find_best_silver_cpu(p);
+		if (best >= 0)
+			target_cpu = best;
+	}
 
 out:
 	if (target_cpu < 0)
